@@ -1,26 +1,29 @@
 from flask import Flask, render_template, request, url_for, redirect
 import os
 import qrcode
-import sqlite3
 import uuid
 from werkzeug.utils import secure_filename
+import psycopg2
+import psycopg2.extras
 
+# --- Flask App Configuration ---
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['QR_FOLDER'] = 'static/qr'
 app.config['DOC_FOLDER'] = 'static/documents'
-app.config['DATABASE'] = 'instance/database.db'
 
+# Create folders if not present
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['QR_FOLDER'], exist_ok=True)
 os.makedirs(app.config['DOC_FOLDER'], exist_ok=True)
-os.makedirs('instance', exist_ok=True)
+
+# --- Database Configuration ---
+DATABASE_URL = os.environ.get('DATABASE_URL')  # Set this in Render → Environment Variables
 
 def get_db():
-    conn = sqlite3.connect(app.config['DATABASE'])
-    conn.row_factory = sqlite3.Row
-    return conn
+    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
 
+# --- Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -35,11 +38,11 @@ def generate():
     # --- Photo Upload ---
     photo = request.files.get('photo')
     photo_filename = ''
-    if photo:
+    if photo and photo.filename:
         photo_filename = f"{card_id}_{secure_filename(photo.filename)}"
         photo.save(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename))
 
-    # --- Document Upload ---
+    # --- Document Uploads ---
     docs = []
     for i in range(1, 4):
         doc = request.files.get(f'document{i}')
@@ -50,7 +53,7 @@ def generate():
         else:
             docs.append('')
 
-    # --- Save to Database ---
+    # --- Save to PostgreSQL ---
     conn = get_db()
     cur = conn.cursor()
     cur.execute('''
@@ -61,7 +64,8 @@ def generate():
             emergency_name1, emergency_phone1, relation1,
             emergency_name2, emergency_phone2, relation2,
             photo, doc1, doc2, doc3
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ''', (
         card_id,
         form.get('name'),
@@ -103,7 +107,7 @@ def generate():
 def view_card(card_id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM cards WHERE card_id = ?', (card_id,))
+    cur.execute('SELECT * FROM cards WHERE card_id = %s', (card_id,))
     data = cur.fetchone()
     conn.close()
 
@@ -123,7 +127,7 @@ def view_card(card_id):
 def download_card(card_id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM cards WHERE card_id = ?', (card_id,))
+    cur.execute('SELECT * FROM cards WHERE card_id = %s', (card_id,))
     data = cur.fetchone()
     conn.close()
 
