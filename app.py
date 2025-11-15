@@ -12,13 +12,12 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['QR_FOLDER'] = 'static/qr'
 app.config['DOC_FOLDER'] = 'static/documents'
 
-# Create folders if not present
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['QR_FOLDER'], exist_ok=True)
 os.makedirs(app.config['DOC_FOLDER'], exist_ok=True)
 
 # --- Database Configuration ---
-DATABASE_URL = os.environ.get('DATABASE_URL')  # Set this in Render → Environment Variables
+DATABASE_URL = os.environ.get('DATABASE_URL') 
 
 def get_db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
